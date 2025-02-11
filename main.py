@@ -1,60 +1,48 @@
 import random
+import time
+
 
 def ler_arquivo(arquivo):
-    with open(arquivo, 'r', encoding='utf-8-sig') as f:
+    with open(arquivo, "r", encoding="utf-8-sig") as f:
         lines = f.readlines()
-    
+
     n_variaveis, n_clausulas = map(int, lines[0].split())
     clauses = [list(map(int, line.split())) for line in lines[1:]]
-    
+
     return n_variaveis, clauses
 
-def avaliando_solucao(solution, clauses, n_variantes):
-    """ Avalia a solução contando quantas cláusulas são satisfeitas. """
-    satisfatoria = 0  # Contador de cláusulas satisfeitas
 
-    # Garante que solution tem tamanho n_variantes (se for menor, preenche com False)
-    if len(solution) < n_variantes:
-        solution = solution[:] + [False] * (n_variantes - len(solution))
-
+def avaliando_solucao(solution, clauses):
+    """Avaliar quantas cláusulas são satisfeitas por uma solução (atribuição de valores às variáveis)."""
+    satisfatoria = 0
     for clause in clauses:
-        clause_satisfatoria = False  # Flag para verificar se a cláusula foi satisfeita
         for literal in clause:
-            var_index = abs(literal) - 1  # Convertendo para índice da lista (começa do 0)
-            valor_esperado = (literal > 0) 
-            valor_atual = solution[var_index]
-            
-            print(f"Verificando literal {literal}: esperado={valor_esperado}, atual={valor_atual}")
-            
-            if valor_atual == valor_esperado:
-                clause_satisfatoria = True
-                break  # Sai do loop, pois a cláusula já foi satisfeita
-        
-        if clause_satisfatoria:
-            satisfatoria += 1
+            var_index = abs(literal) - 1
+            if var_index >= len(solution):
+                continue
+            if (literal > 0 and solution[var_index]) or (
+                literal < 0 and not solution[var_index]
+            ):
+                satisfatoria += 1
+                break
+    return satisfatoria
 
-    return satisfatoria  # Retorna o total de cláusulas satisfeitas
 
-def positivos_e_negativos(e, clauses):
-    """ Estima a influência da variável e contando quantas vezes aparece positiva/negativa. """
-    # Estimativa com alto desempenho, mas imprecisa e superficial
-    count_pos = sum(1 for clause in clauses if (e + 1) in clause)
-    count_neg = sum(1 for clause in clauses if -(e + 1) in clause)
+def obj(e, pos_occ, neg_occ):
+    """
+    Para uma variável e, calcula o número de cláusulas em que ela aparece positivamente (pos_occ[e]) e negativamente (neg_occ[e])
+    Retorna o máximo entre essas duas contagens, indicando a importância da variável na satisfação das cláusulas.
+    """
+    return max(len(pos_occ[e]), len(neg_occ[e]))
 
-    return max(count_pos, count_neg)
 
-def obj(solution, clauses):
-    """ A função objetiva escolhida vai determinar a melhor eficiencia do algoritmo
-    Retorna a pontuação da solução (quantidade de cláusulas satisfeitas). """
-    return positivos_e_negativos(solution, clauses)
-
-def greedy_randomized_construction(n_variaveis, clauses, alfa):
-    """ Fase de Construção: Um novo elemento é inserido na solução corrente, de forma gulosa, 
-        sendo selecionado de um conjunto restrito de candidatos. """
-    S = [None] * n_variaveis 
+def greedy_randomized_construction(n_variaveis, clauses, pos_occ, neg_occ, alfa):
+    """Fase de Construção: Um novo elemento é inserido na solução corrente, de forma gulosa,
+    sendo selecionado de um conjunto restrito de candidatos."""
+    S = [None] * n_variaveis
     C = list(range(n_variaveis))  # Conjunto de variáveis candidatos para uma solução
-    while C:  
-        valores_obj = {e: obj(e, clauses) for e in C}
+    while C:
+        valores_obj = {e: obj(e, pos_occ, neg_occ) for e in C}
 
         c_min = min(valores_obj.values())
         c_max = max(valores_obj.values())
@@ -68,58 +56,98 @@ def greedy_randomized_construction(n_variaveis, clauses, alfa):
         escolhido = random.choice(RCL)
 
         # Atribuir valor para a variável escolhida
-        valor_true = avaliando_solucao(S[:escolhido] + [True] + S[escolhido+1:], clauses, n_variaveis)
-        valor_false = avaliando_solucao(S[:escolhido] + [False] + S[escolhido+1:], clauses, n_variaveis)
+        temp_solution = S.copy()
+        temp_solution[escolhido] = True
+        valor_true = avaliando_solucao(temp_solution, clauses)
 
-        S[escolhido] = valor_true >= valor_false  # Escolhe True se for melhor, senão False
+        temp_solution[escolhido] = False
+        valor_false = avaliando_solucao(temp_solution, clauses)
+
+        S[escolhido] = (
+            valor_true >= valor_false
+        )  # Escolhe True se for melhor, senão False
 
         # Remover a variável escolhida do conjunto de candidatos
         C.remove(escolhido)
 
     return S
 
+
 def local_search(solution, clauses, n_variaveis):
-    """ Fase de Busca Local: Passada a fase anterior, é realizada uma busca local partindo 
-        da vizinhança da solução corrente, até que seja encontrado um ótimo local. 
-        Realiza busca local trocando valores de variáveis para melhorar a solução. """
+    """Melhorar a solução inicial através de uma busca local, explorando a vizinhança da solução atual"""
     melhor_solucao = solution[:]
-    melhor_valor = avaliando_solucao(melhor_solucao, clauses, n_variaveis)
-    
+    melhor_valor = avaliando_solucao(melhor_solucao, clauses)
+
     improvavel_otimo_lugar = True
     while improvavel_otimo_lugar:
         improvavel_otimo_lugar = False
         for i in range(n_variaveis):
-            new_solution = melhor_solucao[:]
-            new_solution[i] = not new_solution[i]  # Troca a variável
-            novo_valor = avaliando_solucao(new_solution, clauses, n_variaveis)
-            
+            melhor_solucao[i] = not melhor_solucao[i]  # Troca a variável in-place
+            novo_valor = avaliando_solucao(melhor_solucao, clauses)
+
             if novo_valor > melhor_valor:  # Atualiza
-                melhor_solucao = new_solution[:]
                 melhor_valor = novo_valor
                 improvavel_otimo_lugar = True
-    
+            else:
+                melhor_solucao[i] = not melhor_solucao[i]  # Reverte a troca
+
     return melhor_solucao
 
-def grasp_max_3sat(arquivo, max_iter, alfa):
-    n_variaveis, clauses = ler_arquivo(arquivo)
+
+def pre_computar_infos(n_variaveis, clauses):
+    """Verifica dentro das clausulas ocorrencias negativas e positivas de cada"""
+    ocorrencias_positivas = [[] for _ in range(n_variaveis)]
+    ocorrencias_negativas = [[] for _ in range(n_variaveis)]
+
+    # Percorre cada cláusula e seus literais
+    for clause_index, clause in enumerate(clauses):
+        for literal in clause:
+            var_index = abs(literal) - 1  # converte para índice (0-indexado)
+            if literal > 0:
+                ocorrencias_positivas[var_index].append(clause_index)
+            else:
+                ocorrencias_negativas[var_index].append(clause_index)
+
+    return ocorrencias_positivas, ocorrencias_negativas
+
+
+def grasp_max_3sat(n_variaveis, clauses, pos_occ, neg_occ, max_iter, alfa):
     melhor_solucao = None
     melhor_valor = 0
-    
+
     for _ in range(max_iter):
-        solution = greedy_randomized_construction(n_variaveis, clauses, alfa)
+        solution = greedy_randomized_construction(
+            n_variaveis, clauses, pos_occ, neg_occ, alfa
+        )
         solution = local_search(solution, clauses, n_variaveis)
-        solution_valor = avaliando_solucao(solution, clauses, n_variaveis)
-        
+        solution_valor = avaliando_solucao(solution, clauses)
+
         if solution_valor > melhor_valor:
             melhor_solucao = solution
             melhor_valor = solution_valor
-    
+
     return melhor_solucao, melhor_valor
 
-def main():
-    arquivo = 'SAT1.txt'
-    best_solution, best_value = grasp_max_3sat(arquivo, max_iter=50, alfa=0.3)
-    print(f'Melhor solução encontrada satisfaz {best_value} cláusulas.')
 
-if __name__ == '__main__':
+def main():
+    arquivo = "SAT2.txt"
+
+    inicio_contador = time.time()
+
+    n_variaveis, clauses = ler_arquivo(arquivo=arquivo)
+
+    oco_pos, oco_neg = pre_computar_infos(n_variaveis, clauses)
+
+    melhor_solucao, melhor_valor = grasp_max_3sat(
+        n_variaveis, clauses, oco_pos, oco_neg, max_iter=50, alfa=0.3
+    )
+
+    fim_contador = time.time()
+    tempo_total = fim_contador - inicio_contador
+    print(
+        f"Melhor solução encontrada satisfaz {melhor_valor} cláusulas. Em \t{tempo_total:.4f} S"
+    )
+
+
+if __name__ == "__main__":
     main()
