@@ -75,6 +75,7 @@ def greedy_randomized_construction(n_variaveis, clauses, pos_occ, neg_occ, alfa)
 
 def local_search(solution, clauses, n_variaveis):
     """Melhorar a solução inicial através de uma busca local, explorando a vizinhança da solução atual"""
+
     melhor_solucao = solution[:]
     melhor_valor = avaliando_solucao(melhor_solucao, clauses)
 
@@ -114,39 +115,56 @@ def pre_computar_infos(n_variaveis, clauses):
 def grasp_max_3sat(n_variaveis, clauses, pos_occ, neg_occ, max_iter, alfa):
     melhor_solucao = None
     melhor_valor = 0
+    cont = 0
 
     for _ in range(max_iter):
         solution = greedy_randomized_construction(
             n_variaveis, clauses, pos_occ, neg_occ, alfa
         )
+        primeira_solucao = avaliando_solucao(solution, clauses)
+        if cont == 0:
+            print(f"Solução Inicial satisfaz {primeira_solucao} cláusulas")
         solution = local_search(solution, clauses, n_variaveis)
         solution_valor = avaliando_solucao(solution, clauses)
 
         if solution_valor > melhor_valor:
             melhor_solucao = solution
             melhor_valor = solution_valor
+        cont += 1
 
     return melhor_solucao, melhor_valor
 
 
 def main():
-    arquivo = "SAT2.txt"
+    arquivos = ["SAT1.txt", "SAT2.txt", "SAT3.txt"]
+    iter = [25, 50, 75, 100]
+    alfa = [0.3, 0.4, 0.5, 0.7]
+    for arquivo in arquivos:
+        print("=======================================================================")
+        print(f"Iniciando {arquivo}")
+        for i in range(4):
+            for j in range(4):
 
-    inicio_contador = time.time()
+                inicio_contador = time.time()
 
-    n_variaveis, clauses = ler_arquivo(arquivo=arquivo)
+                n_variaveis, clauses = ler_arquivo(arquivo=arquivo)
 
-    oco_pos, oco_neg = pre_computar_infos(n_variaveis, clauses)
+                oco_pos, oco_neg = pre_computar_infos(n_variaveis, clauses)
+                melhor_solucao, melhor_valor = grasp_max_3sat(
+                    n_variaveis,
+                    clauses,
+                    oco_pos,
+                    oco_neg,
+                    max_iter=iter[i],
+                    alfa=alfa[j],
+                )
 
-    melhor_solucao, melhor_valor = grasp_max_3sat(
-        n_variaveis, clauses, oco_pos, oco_neg, max_iter=50, alfa=0.3
-    )
-
-    fim_contador = time.time()
-    tempo_total = fim_contador - inicio_contador
-    print(
-        f"Melhor solução encontrada satisfaz {melhor_valor} cláusulas. Em \t{tempo_total:.4f} S"
-    )
+                fim_contador = time.time()
+                tempo_total = fim_contador - inicio_contador
+                print(
+                    f"Usando {iter[i]} iterações e um alfa igual a {alfa[j]}, melhor solução encontrada satisfaz {melhor_valor} cláusulas. Tempo {tempo_total:.4f}S\n"
+                )
+        print("=======================================================================")
 
 
 if __name__ == "__main__":
