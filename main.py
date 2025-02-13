@@ -123,7 +123,7 @@ def grasp_max_3sat(n_variaveis, clauses, pos_occ, neg_occ, max_iter, alfa):
         )
         primeira_solucao = avaliando_solucao(solution, clauses)
         if cont == 0:
-            print(f"Solução Inicial {primeira_solucao}")
+            print(f"Solução Inicial satisfaz {primeira_solucao} cláusulas")
         solution = local_search(solution, clauses, n_variaveis)
         solution_valor = avaliando_solucao(solution, clauses)
 
@@ -162,7 +162,7 @@ def main():
                 fim_contador = time.time()
                 tempo_total = fim_contador - inicio_contador
                 print(
-                    f"Usando {iter[i]} iterações e um alfa igual a {alfa[j]}, melhor solução encontrada satisfaz {melhor_valor} cláusulas. Tempo \t{tempo_total:.4f}S"
+                    f"Usando {iter[i]} iterações e um alfa igual a {alfa[j]}, melhor solução encontrada satisfaz {melhor_valor} cláusulas. Tempo {tempo_total:.4f}S\n"
                 )
         print("=======================================================================")
 
